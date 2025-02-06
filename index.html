@@ -4,21 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scanner Barcode</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.19.1/zxing.min.js"></script>
     <style>
         body {
             margin: 0;
             padding: 20px;
             font-family: Arial, sans-serif;
         }
-        #interactive.viewport {
+        .camera-container {
             position: relative;
             width: 100%;
-            height: 300px;
+            max-width: 500px;
+            margin: 0 auto;
         }
-        #interactive.viewport > canvas, #interactive.viewport > video {
-            max-width: 100%;
+        .camera-button {
             width: 100%;
+            padding: 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.1em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .camera-button svg {
+            width: 24px;
+            height: 24px;
+        }
+        #photo-preview {
+            width: 100%;
+            max-width: 500px;
+            margin: 10px auto;
+            display: none;
         }
         .scanned-items {
             margin-top: 20px;
@@ -110,6 +130,21 @@
             font-size: 0.8em;
             margin-right: 5px;
         }
+        .scanning-status {
+            text-align: center;
+            margin: 10px 0;
+            font-weight: bold;
+            display: none;
+        }
+        .error-status {
+            color: #dc3545;
+        }
+        .success-status {
+            color: #28a745;
+        }
+        #camera-input {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -119,13 +154,22 @@
         Elementi univoci scansionati: <span id="items-counter">0</span>
     </div>
 
-    <div class="controls">
-        <button id="start-button">Avvia Scanner</button>
-        <button id="stop-button" disabled>Ferma Scanner</button>
-        <button id="export-button">Esporta CSV</button>
+    <div class="camera-container">
+        <input type="file" id="camera-input" accept="image/*" capture="environment">
+        <button class="camera-button" onclick="document.getElementById('camera-input').click()">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+                <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            Scatta Foto
+        </button>
+        <img id="photo-preview" alt="Anteprima foto">
+        <div id="scanning-status" class="scanning-status">Analisi dell'immagine in corso...</div>
     </div>
 
-    <div id="interactive" class="viewport"></div>
+    <div class="controls">
+        <button id="export-button">Esporta CSV</button>
+    </div>
     
     <div class="scanned-items">
         <h3>Prodotti scansionati:</h3>
@@ -152,54 +196,61 @@
     </div>
 
     <script>
-        let scannedCodes = new Map(); // Usando Map per gestire i prodotti univoci
-        let isScanning = false;
+        let scannedCodes = new Map();
         let tempScannedCode = null;
         let isUpdating = false;
 
-        function initQuagga() {
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.querySelector("#interactive"),
-                    constraints: {
-                        facingMode: "environment"
-                    },
-                },
-                decoder: {
-                    readers: [
-                        "ean_reader",
-                        "ean_8_reader",
-                        "code_128_reader",
-                        "code_39_reader",
-                        "upc_reader"
-                    ]
+        const cameraInput = document.getElementById('camera-input');
+        const photoPreview = document.getElementById('photo-preview');
+        const scanningStatus = document.getElementById('scanning-status');
+
+        cameraInput.addEventListener('change', async (e) => {
+            if (e.target.files && e.target.files[0]) {
+                const file = e.target.files[0];
+                
+                // Mostra l'anteprima
+                photoPreview.src = URL.createObjectURL(file);
+                photoPreview.style.display = 'block';
+                
+                // Mostra lo stato di scansione
+                scanningStatus.textContent = 'Analisi dell\'immagine in corso...';
+                scanningStatus.className = 'scanning-status';
+                scanningStatus.style.display = 'block';
+
+                try {
+                    const codeReader = new ZXing.BrowserMultiFormatReader();
+                    const imageElement = await createImageElement(file);
+                    const result = await codeReader.decodeFromImage(imageElement);
+                    
+                    if (result && result.text) {
+                        scanningStatus.textContent = 'Codice a barre rilevato!';
+                        scanningStatus.className = 'scanning-status success-status';
+                        handleScannedCode(result.text);
+                    } else {
+                        throw new Error('Nessun codice a barre rilevato');
+                    }
+                } catch (error) {
+                    scanningStatus.textContent = 'Nessun codice a barre rilevato. Riprova.';
+                    scanningStatus.className = 'scanning-status error-status';
+                    console.error('Errore nella scansione:', error);
                 }
-            }, function(err) {
-                if (err) {
-                    console.error(err);
-                    alert("Errore nell'accesso alla fotocamera: " + err);
-                    return;
-                }
-                isScanning = true;
-                document.getElementById('start-button').disabled = true;
-                document.getElementById('stop-button').disabled = false;
-                Quagga.start();
+
+                // Reset input file per permettere di selezionare lo stesso file
+                e.target.value = '';
+            }
+        });
+
+        function createImageElement(file) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.src = URL.createObjectURL(file);
             });
         }
 
-        Quagga.onDetected(function(result) {
-            let code = result.codeResult.code;
+        function handleScannedCode(code) {
             tempScannedCode = code;
             
-            // Ferma lo scanner dopo ogni scansione
-            Quagga.stop();
-            isScanning = false;
-            document.getElementById('start-button').disabled = false;
-            document.getElementById('stop-button').disabled = true;
-
-            // Controlla se il codice è già stato scansionato
             if (scannedCodes.has(code)) {
                 isUpdating = true;
                 const existingProduct = scannedCodes.get(code);
@@ -216,7 +267,7 @@
             }
 
             showConfirmationDialog(code);
-        });
+        }
 
         function showConfirmationDialog(code) {
             document.getElementById('scanned-code').textContent = code;
@@ -268,6 +319,8 @@
             document.getElementById('product-name').value = '';
             document.getElementById('product-quantity').value = '1';
             document.getElementById('duplicate-warning').style.display = 'none';
+            photoPreview.style.display = 'none';
+            scanningStatus.style.display = 'none';
             tempScannedCode = null;
             isUpdating = false;
         }
@@ -335,16 +388,6 @@
             document.body.removeChild(link);
         }
 
-        // Event Listeners
-        document.getElementById('start-button').addEventListener('click', initQuagga);
-        
-        document.getElementById('stop-button').addEventListener('click', () => {
-            Quagga.stop();
-            isScanning = false;
-            document.getElementById('start-button').disabled = false;
-            document.getElementById('stop-button').disabled = true;
-        });
-
         document.getElementById('export-button').addEventListener('click', exportToCSV);
 
         // Service Worker per funzionalità offline
@@ -353,8 +396,3 @@
                 console.log('ServiceWorker registrato');
             }).catch(function(err) {
                 console.log('Errore registrazione ServiceWorker:', err);
-            });
-        }
-    </script>
-</body>
-</html>
