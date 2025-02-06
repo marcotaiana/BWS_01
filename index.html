@@ -3,396 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scanner Barcode</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.19.1/zxing.min.js"></script>
-    <style>
-        body {
-            margin: 0;
-            padding: 20px;
-            font-family: Arial, sans-serif;
-        }
-        .camera-container {
-            position: relative;
-            width: 100%;
-            max-width: 500px;
-            margin: 0 auto;
-        }
-        .camera-button {
-            width: 100%;
-            padding: 15px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 1.1em;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-        .camera-button svg {
-            width: 24px;
-            height: 24px;
-        }
-        #photo-preview {
-            width: 100%;
-            max-width: 500px;
-            margin: 10px auto;
-            display: none;
-        }
-        .scanned-items {
-            margin-top: 20px;
-            border: 1px solid #ccc;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        .controls {
-            margin: 20px 0;
-            display: flex;
-            gap: 10px;
-        }
-        button {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            background-color: #007bff;
-            color: white;
-            cursor: pointer;
-        }
-        button:disabled {
-            background-color: #cccccc;
-        }
-        #confirmation-dialog {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.3);
-            z-index: 1000;
-            width: 90%;
-            max-width: 400px;
-        }
-        #confirmation-dialog input {
-            width: 100%;
-            padding: 8px;
-            margin: 10px 0;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        .dialog-buttons {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 15px;
-        }
-        .counter {
-            background-color: #f8f9fa;
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 15px;
-            font-size: 1.2em;
-            text-align: center;
-        }
-        .overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 999;
-        }
-        .duplicate-warning {
-            color: #dc3545;
-            display: none;
-            margin-top: 10px;
-            font-weight: bold;
-        }
-        .product-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 5px 0;
-            border-bottom: 1px solid #eee;
-        }
-        .delete-button {
-            background-color: #dc3545;
-            padding: 5px 10px;
-            font-size: 0.8em;
-        }
-        .update-quantity {
-            background-color: #28a745;
-            padding: 5px 10px;
-            font-size: 0.8em;
-            margin-right: 5px;
-        }
-        .scanning-status {
-            text-align: center;
-            margin: 10px 0;
-            font-weight: bold;
-            display: none;
-        }
-        .error-status {
-            color: #dc3545;
-        }
-        .success-status {
-            color: #28a745;
-        }
-        #camera-input {
-            display: none;
-        }
-    </style>
-</head>
-<body>
-    <h1>Scanner Barcode</h1>
-    
-    <div class="counter">
-        Elementi univoci scansionati: <span id="items-counter">0</span>
-    </div>
-
-    <div class="camera-container">
-        <input type="file" id="camera-input" accept="image/*" capture="environment">
-        <button class="camera-button" onclick="document.getElementById('camera-input').click()">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
-                <circle cx="12" cy="12" r="3"></circle>
-            </svg>
-            Scatta Foto
-        </button>
-        <img id="photo-preview" alt="Anteprima foto">
-        <div id="scanning-status" class="scanning-status">Analisi dell'immagine in corso...</div>
-    </div>
-
-    <div class="controls">
-        <button id="export-button">Esporta CSV</button>
-    </div>
-    
-    <div class="scanned-items">
-        <h3>Prodotti scansionati:</h3>
-        <ul id="scanned-list"></ul>
-    </div>
-
-    <div class="overlay" id="overlay"></div>
-    <div id="confirmation-dialog">
-        <h3 id="dialog-title">Conferma Prodotto</h3>
-        <p>Codice a barre: <strong id="scanned-code"></strong></p>
-        <div id="duplicate-warning" class="duplicate-warning">
-            Questo prodotto è già stato scansionato. Vuoi aggiornare la quantità?
-        </div>
-        <div>
-            <label for="product-name">Nome Prodotto:</label>
-            <input type="text" id="product-name" placeholder="Inserisci nome prodotto">
-            <label for="product-quantity">Quantità:</label>
-            <input type="number" id="product-quantity" value="1" min="1">
-        </div>
-        <div class="dialog-buttons">
-            <button onclick="cancelScanning()">Annulla</button>
-            <button onclick="confirmProduct()" style="background-color: #28a745">Conferma</button>
-        </div>
-    </div>
-
+    <title>Barcode Scanner</title>
+    <script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
     <script>
-        let scannedCodes = new Map();
-        let tempScannedCode = null;
-        let isUpdating = false;
+        let scannedBarcodes = new Set();
 
-        const cameraInput = document.getElementById('camera-input');
-        const photoPreview = document.getElementById('photo-preview');
-        const scanningStatus = document.getElementById('scanning-status');
-
-        cameraInput.addEventListener('change', async (e) => {
-            if (e.target.files && e.target.files[0]) {
-                const file = e.target.files[0];
-                
-                // Mostra l'anteprima
-                photoPreview.src = URL.createObjectURL(file);
-                photoPreview.style.display = 'block';
-                
-                // Mostra lo stato di scansione
-                scanningStatus.textContent = 'Analisi dell\'immagine in corso...';
-                scanningStatus.className = 'scanning-status';
-                scanningStatus.style.display = 'block';
-
-                try {
-                    const codeReader = new ZXing.BrowserMultiFormatReader();
-                    const imageElement = await createImageElement(file);
-                    const result = await codeReader.decodeFromImage(imageElement);
-                    
-                    if (result && result.text) {
-                        scanningStatus.textContent = 'Codice a barre rilevato!';
-                        scanningStatus.className = 'scanning-status success-status';
-                        handleScannedCode(result.text);
-                    } else {
-                        throw new Error('Nessun codice a barre rilevato');
-                    }
-                } catch (error) {
-                    scanningStatus.textContent = 'Nessun codice a barre rilevato. Riprova.';
-                    scanningStatus.className = 'scanning-status error-status';
-                    console.error('Errore nella scansione:', error);
+        function startScanner() {
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.querySelector("#scanner")
+                },
+                decoder: {
+                    readers: ["code_128_reader", "ean_reader", "ean_8_reader", "upc_reader"]
                 }
+            }, function (err) {
+                if (err) {
+                    console.error(err);
+                    return;
+                }
+                Quagga.start();
+            });
 
-                // Reset input file per permettere di selezionare lo stesso file
-                e.target.value = '';
-            }
-        });
-
-        function createImageElement(file) {
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.onload = () => resolve(img);
-                img.src = URL.createObjectURL(file);
+            Quagga.onDetected(function (data) {
+                let barcode = data.codeResult.code;
+                if (barcode.length >= 8 && !scannedBarcodes.has(barcode)) { // Evita barcode troppo corti
+                    scannedBarcodes.add(barcode);
+                    updateCounter();
+                    updateScannedList(barcode);
+                }
             });
         }
 
-        function handleScannedCode(code) {
-            tempScannedCode = code;
-            
-            if (scannedCodes.has(code)) {
-                isUpdating = true;
-                const existingProduct = scannedCodes.get(code);
-                document.getElementById('product-name').value = existingProduct.name;
-                document.getElementById('product-quantity').value = existingProduct.quantity;
-                document.getElementById('duplicate-warning').style.display = 'block';
-                document.getElementById('dialog-title').textContent = 'Aggiorna Prodotto';
-            } else {
-                isUpdating = false;
-                document.getElementById('product-name').value = '';
-                document.getElementById('product-quantity').value = '1';
-                document.getElementById('duplicate-warning').style.display = 'none';
-                document.getElementById('dialog-title').textContent = 'Conferma Prodotto';
-            }
-
-            showConfirmationDialog(code);
+        function updateCounter() {
+            document.getElementById("barcodeCounter").innerText = scannedBarcodes.size;
         }
 
-        function showConfirmationDialog(code) {
-            document.getElementById('scanned-code').textContent = code;
-            document.getElementById('confirmation-dialog').style.display = 'block';
-            document.getElementById('overlay').style.display = 'block';
-            document.getElementById('product-name').focus();
+        function updateScannedList(barcode) {
+            let list = document.getElementById("scannedList");
+            let listItem = document.createElement("li");
+            listItem.innerText = barcode;
+            list.appendChild(listItem);
         }
 
-        function confirmProduct() {
-            const productName = document.getElementById('product-name').value.trim();
-            const quantity = parseInt(document.getElementById('product-quantity').value);
-            
-            if (!productName) {
-                alert('Inserisci il nome del prodotto');
-                return;
-            }
-
-            if (quantity < 1) {
-                alert('La quantità deve essere maggiore di 0');
-                return;
-            }
-
-            scannedCodes.set(tempScannedCode, {
-                code: tempScannedCode,
-                name: productName,
-                quantity: quantity,
-                timestamp: new Date().toISOString()
-            });
-
-            updateScannedList();
-            closeConfirmationDialog();
-            new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH+Di3hyfXdteIeKi4ServiceWorker...').play();
-        }
-
-        function deleteProduct(code) {
-            if (confirm('Sei sicuro di voler eliminare questo prodotto?')) {
-                scannedCodes.delete(code);
-                updateScannedList();
-            }
-        }
-
-        function cancelScanning() {
-            closeConfirmationDialog();
-        }
-
-        function closeConfirmationDialog() {
-            document.getElementById('confirmation-dialog').style.display = 'none';
-            document.getElementById('overlay').style.display = 'none';
-            document.getElementById('product-name').value = '';
-            document.getElementById('product-quantity').value = '1';
-            document.getElementById('duplicate-warning').style.display = 'none';
-            photoPreview.style.display = 'none';
-            scanningStatus.style.display = 'none';
-            tempScannedCode = null;
-            isUpdating = false;
-        }
-
-        function updateScannedList() {
-            const list = document.getElementById('scanned-list');
-            const counter = document.getElementById('items-counter');
-            list.innerHTML = '';
-            
-            scannedCodes.forEach((item, code) => {
-                const li = document.createElement('li');
-                li.className = 'product-item';
-                
-                const productInfo = document.createElement('span');
-                productInfo.textContent = `${item.name} (${item.code}) - Quantità: ${item.quantity} - ${new Date(item.timestamp).toLocaleString()}`;
-                
-                const buttonContainer = document.createElement('div');
-                
-                const updateButton = document.createElement('button');
-                updateButton.className = 'update-quantity';
-                updateButton.textContent = 'Modifica';
-                updateButton.onclick = () => {
-                    tempScannedCode = code;
-                    isUpdating = true;
-                    document.getElementById('product-name').value = item.name;
-                    document.getElementById('product-quantity').value = item.quantity;
-                    document.getElementById('dialog-title').textContent = 'Aggiorna Prodotto';
-                    showConfirmationDialog(code);
-                };
-                
-                const deleteButton = document.createElement('button');
-                deleteButton.className = 'delete-button';
-                deleteButton.textContent = 'Elimina';
-                deleteButton.onclick = () => deleteProduct(code);
-                
-                buttonContainer.appendChild(updateButton);
-                buttonContainer.appendChild(deleteButton);
-                
-                li.appendChild(productInfo);
-                li.appendChild(buttonContainer);
-                list.appendChild(li);
-            });
-            
-            counter.textContent = scannedCodes.size;
-        }
-
-        function exportToCSV() {
-            if (scannedCodes.size === 0) {
-                alert('Nessun prodotto da esportare');
-                return;
-            }
-
-            const csvContent = "data:text/csv;charset=utf-8," 
-                + "Nome,Codice,Quantità,Data\n"
-                + Array.from(scannedCodes.values()).map(item => 
-                    `${item.name},${item.code},${item.quantity},${item.timestamp}`
-                ).join("\n");
-
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
+        function exportCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,Barcode,Data/Ora\n" + 
+                Array.from(scannedBarcodes).map(code => `${code},${new Date().toLocaleString()}`).join("\n");
+            let encodedUri = encodeURI(csvContent);
+            let link = document.createElement("a");
             link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "prodotti_scansionati.csv");
+            link.setAttribute("download", "barcodes.csv");
             document.body.appendChild(link);
             link.click();
-            document.body.removeChild(link);
         }
-
-        document.getElementById('export-button').addEventListener('click', exportToCSV);
-
-        // Service Worker per funzionalità offline
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').then(function(registration) {
-                console.log('ServiceWorker registrato');
-            }).catch(function(err) {
-                console.log('Errore registrazione ServiceWorker:', err);
+    </script>
+</head>
+<body>
+    <h1>Barcode Scanner</h1>
+    <div id="scanner" style="width: 100%; height: 300px; border: 1px solid black;"></div>
+    <p>Barcode univoci scansionati: <span id="barcodeCounter">0</span></p>
+    <button onclick="startScanner()">Avvia Scanner</button>
+    <button onclick="exportCSV()">Esporta CSV</button>
+    <ul id="scannedList"></ul>
+</body>
+</html>
