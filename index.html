@@ -9,31 +9,46 @@
         let scannedBarcodes = new Set();
 
         function startScanner() {
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.querySelector("#scanner")
-                },
-                decoder: {
-                    readers: ["code_128_reader", "ean_reader", "ean_8_reader", "upc_reader"]
-                }
-            }, function (err) {
-                if (err) {
-                    console.error(err);
-                    return;
-                }
-                Quagga.start();
-            });
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert("Accesso alla fotocamera non supportato dal browser.");
+                return;
+            }
 
-            Quagga.onDetected(function (data) {
-                let barcode = data.codeResult.code;
-                if (barcode.length >= 8 && !scannedBarcodes.has(barcode)) { // Evita barcode troppo corti
-                    scannedBarcodes.add(barcode);
-                    updateCounter();
-                    updateScannedList(barcode);
-                }
-            });
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function (stream) {
+                    Quagga.init({
+                        inputStream: {
+                            name: "Live",
+                            type: "LiveStream",
+                            target: document.querySelector("#scanner"),
+                            constraints: {
+                                facingMode: "environment"
+                            }
+                        },
+                        decoder: {
+                            readers: ["code_128_reader", "ean_reader", "ean_8_reader", "upc_reader"]
+                        },
+                        locate: true
+                    }, function (err) {
+                        if (err) {
+                            console.error("Errore inizializzazione Quagga:", err);
+                            return;
+                        }
+                        Quagga.start();
+                    });
+
+                    Quagga.onDetected(function (data) {
+                        let barcode = data.codeResult.code;
+                        if (barcode.length >= 8 && !scannedBarcodes.has(barcode)) {
+                            scannedBarcodes.add(barcode);
+                            updateCounter();
+                            updateScannedList(barcode);
+                        }
+                    });
+                })
+                .catch(function (error) {
+                    alert("Impossibile accedere alla fotocamera: " + error.message);
+                });
         }
 
         function updateCounter() {
@@ -48,7 +63,11 @@
         }
 
         function exportCSV() {
-            let csvContent = "data:text/csv;charset=utf-8,Barcode,Data/Ora\n" + 
+            if (scannedBarcodes.size === 0) {
+                alert("Nessun barcode scansionato da esportare.");
+                return;
+            }
+            let csvContent = "data:text/csv;charset=utf-8,Barcode,Data/Ora\n" +
                 Array.from(scannedBarcodes).map(code => `${code},${new Date().toLocaleString()}`).join("\n");
             let encodedUri = encodeURI(csvContent);
             let link = document.createElement("a");
