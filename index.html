@@ -86,13 +86,37 @@
             background: rgba(0,0,0,0.5);
             z-index: 999;
         }
+        .duplicate-warning {
+            color: #dc3545;
+            display: none;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        .product-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .delete-button {
+            background-color: #dc3545;
+            padding: 5px 10px;
+            font-size: 0.8em;
+        }
+        .update-quantity {
+            background-color: #28a745;
+            padding: 5px 10px;
+            font-size: 0.8em;
+            margin-right: 5px;
+        }
     </style>
 </head>
 <body>
     <h1>Scanner Barcode</h1>
     
     <div class="counter">
-        Elementi scansionati: <span id="items-counter">0</span>
+        Elementi univoci scansionati: <span id="items-counter">0</span>
     </div>
 
     <div class="controls">
@@ -110,8 +134,11 @@
 
     <div class="overlay" id="overlay"></div>
     <div id="confirmation-dialog">
-        <h3>Conferma Prodotto</h3>
+        <h3 id="dialog-title">Conferma Prodotto</h3>
         <p>Codice a barre: <strong id="scanned-code"></strong></p>
+        <div id="duplicate-warning" class="duplicate-warning">
+            Questo prodotto è già stato scansionato. Vuoi aggiornare la quantità?
+        </div>
         <div>
             <label for="product-name">Nome Prodotto:</label>
             <input type="text" id="product-name" placeholder="Inserisci nome prodotto">
@@ -125,11 +152,11 @@
     </div>
 
     <script>
-        let scannedCodes = [];
+        let scannedCodes = new Map(); // Usando Map per gestire i prodotti univoci
         let isScanning = false;
         let tempScannedCode = null;
+        let isUpdating = false;
 
-        // Inizializzazione di QuaggaJS
         function initQuagga() {
             Quagga.init({
                 inputStream: {
@@ -162,17 +189,33 @@
             });
         }
 
-        // Gestione degli eventi di scansione
         Quagga.onDetected(function(result) {
             let code = result.codeResult.code;
-            if (!scannedCodes.some(item => item.code === code)) {
-                tempScannedCode = code;
-                showConfirmationDialog(code);
-                Quagga.stop();
-                isScanning = false;
-                document.getElementById('start-button').disabled = false;
-                document.getElementById('stop-button').disabled = true;
+            tempScannedCode = code;
+            
+            // Ferma lo scanner dopo ogni scansione
+            Quagga.stop();
+            isScanning = false;
+            document.getElementById('start-button').disabled = false;
+            document.getElementById('stop-button').disabled = true;
+
+            // Controlla se il codice è già stato scansionato
+            if (scannedCodes.has(code)) {
+                isUpdating = true;
+                const existingProduct = scannedCodes.get(code);
+                document.getElementById('product-name').value = existingProduct.name;
+                document.getElementById('product-quantity').value = existingProduct.quantity;
+                document.getElementById('duplicate-warning').style.display = 'block';
+                document.getElementById('dialog-title').textContent = 'Aggiorna Prodotto';
+            } else {
+                isUpdating = false;
+                document.getElementById('product-name').value = '';
+                document.getElementById('product-quantity').value = '1';
+                document.getElementById('duplicate-warning').style.display = 'none';
+                document.getElementById('dialog-title').textContent = 'Conferma Prodotto';
             }
+
+            showConfirmationDialog(code);
         });
 
         function showConfirmationDialog(code) {
@@ -184,14 +227,19 @@
 
         function confirmProduct() {
             const productName = document.getElementById('product-name').value.trim();
-            const quantity = document.getElementById('product-quantity').value;
+            const quantity = parseInt(document.getElementById('product-quantity').value);
             
             if (!productName) {
                 alert('Inserisci il nome del prodotto');
                 return;
             }
 
-            scannedCodes.push({
+            if (quantity < 1) {
+                alert('La quantità deve essere maggiore di 0');
+                return;
+            }
+
+            scannedCodes.set(tempScannedCode, {
                 code: tempScannedCode,
                 name: productName,
                 quantity: quantity,
@@ -203,6 +251,13 @@
             new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH+Di3hyfXdteIeKi4ServiceWorker...').play();
         }
 
+        function deleteProduct(code) {
+            if (confirm('Sei sicuro di voler eliminare questo prodotto?')) {
+                scannedCodes.delete(code);
+                updateScannedList();
+            }
+        }
+
         function cancelScanning() {
             closeConfirmationDialog();
         }
@@ -212,32 +267,62 @@
             document.getElementById('overlay').style.display = 'none';
             document.getElementById('product-name').value = '';
             document.getElementById('product-quantity').value = '1';
+            document.getElementById('duplicate-warning').style.display = 'none';
             tempScannedCode = null;
+            isUpdating = false;
         }
 
-        // Aggiorna la lista dei codici scansionati
         function updateScannedList() {
             const list = document.getElementById('scanned-list');
             const counter = document.getElementById('items-counter');
             list.innerHTML = '';
-            scannedCodes.forEach(item => {
+            
+            scannedCodes.forEach((item, code) => {
                 const li = document.createElement('li');
-                li.textContent = `${item.name} (${item.code}) - Quantità: ${item.quantity} - ${new Date(item.timestamp).toLocaleString()}`;
+                li.className = 'product-item';
+                
+                const productInfo = document.createElement('span');
+                productInfo.textContent = `${item.name} (${item.code}) - Quantità: ${item.quantity} - ${new Date(item.timestamp).toLocaleString()}`;
+                
+                const buttonContainer = document.createElement('div');
+                
+                const updateButton = document.createElement('button');
+                updateButton.className = 'update-quantity';
+                updateButton.textContent = 'Modifica';
+                updateButton.onclick = () => {
+                    tempScannedCode = code;
+                    isUpdating = true;
+                    document.getElementById('product-name').value = item.name;
+                    document.getElementById('product-quantity').value = item.quantity;
+                    document.getElementById('dialog-title').textContent = 'Aggiorna Prodotto';
+                    showConfirmationDialog(code);
+                };
+                
+                const deleteButton = document.createElement('button');
+                deleteButton.className = 'delete-button';
+                deleteButton.textContent = 'Elimina';
+                deleteButton.onclick = () => deleteProduct(code);
+                
+                buttonContainer.appendChild(updateButton);
+                buttonContainer.appendChild(deleteButton);
+                
+                li.appendChild(productInfo);
+                li.appendChild(buttonContainer);
                 list.appendChild(li);
             });
-            counter.textContent = scannedCodes.length;
+            
+            counter.textContent = scannedCodes.size;
         }
 
-        // Esporta in CSV
         function exportToCSV() {
-            if (scannedCodes.length === 0) {
+            if (scannedCodes.size === 0) {
                 alert('Nessun prodotto da esportare');
                 return;
             }
 
             const csvContent = "data:text/csv;charset=utf-8," 
                 + "Nome,Codice,Quantità,Data\n"
-                + scannedCodes.map(item => 
+                + Array.from(scannedCodes.values()).map(item => 
                     `${item.name},${item.code},${item.quantity},${item.timestamp}`
                 ).join("\n");
 
