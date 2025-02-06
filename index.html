@@ -8,54 +8,47 @@
     <script>
         let scannedBarcodes = new Set();
 
-        function captureImage() {
+        function startScanner() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 alert("Accesso alla fotocamera non supportato dal browser.");
                 return;
             }
 
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            navigator.mediaDevices.getUserMedia({ video: true })
                 .then(function (stream) {
-                    let video = document.createElement("video");
-                    video.srcObject = stream;
-                    video.play();
+                    Quagga.init({
+                        inputStream: {
+                            name: "Live",
+                            type: "LiveStream",
+                            target: document.querySelector("#scanner"),
+                            constraints: {
+                                facingMode: "environment"
+                            }
+                        },
+                        decoder: {
+                            readers: ["code_128_reader", "ean_reader", "ean_8_reader", "upc_reader"]
+                        },
+                        locate: true
+                    }, function (err) {
+                        if (err) {
+                            console.error("Errore inizializzazione Quagga:", err);
+                            return;
+                        }
+                        Quagga.start();
+                    });
 
-                    video.onloadedmetadata = function () {
-                        let canvas = document.createElement("canvas");
-                        canvas.width = video.videoWidth;
-                        canvas.height = video.videoHeight;
-                        let context = canvas.getContext("2d");
-
-                        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        stream.getTracks().forEach(track => track.stop());
-
-                        processImage(canvas);
-                    };
+                    Quagga.onDetected(function (data) {
+                        let barcode = data.codeResult.code;
+                        if (barcode.length >= 8 && !scannedBarcodes.has(barcode)) {
+                            scannedBarcodes.add(barcode);
+                            updateCounter();
+                            updateScannedList(barcode);
+                        }
+                    });
                 })
                 .catch(function (error) {
                     alert("Impossibile accedere alla fotocamera: " + error.message);
                 });
-        }
-
-        function processImage(canvas) {
-            Quagga.decodeSingle({
-                src: canvas.toDataURL(),
-                numOfWorkers: 0,
-                decoder: {
-                    readers: ["code_128_reader", "ean_reader", "ean_8_reader", "upc_reader"]
-                }
-            }, function (result) {
-                if (result && result.codeResult) {
-                    let barcode = result.codeResult.code;
-                    if (barcode.length >= 8 && !scannedBarcodes.has(barcode)) {
-                        scannedBarcodes.add(barcode);
-                        updateCounter();
-                        updateScannedList(barcode);
-                    }
-                } else {
-                    alert("Nessun barcode rilevato. Riprova.");
-                }
-            });
         }
 
         function updateCounter() {
@@ -87,8 +80,9 @@
 </head>
 <body>
     <h1>Barcode Scanner</h1>
-    <button onclick="captureImage()">Scansiona Barcode</button>
+    <div id="scanner" style="width: 100%; height: 300px; border: 1px solid black;"></div>
     <p>Barcode univoci scansionati: <span id="barcodeCounter">0</span></p>
+    <button onclick="startScanner()">Avvia Scanner</button>
     <button onclick="exportCSV()">Esporta CSV</button>
     <ul id="scannedList"></ul>
 </body>
