@@ -42,11 +42,59 @@
         button:disabled {
             background-color: #cccccc;
         }
+        #confirmation-dialog {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+            width: 90%;
+            max-width: 400px;
+        }
+        #confirmation-dialog input {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .dialog-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+        .counter {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            text-align: center;
+        }
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
     </style>
 </head>
 <body>
     <h1>Scanner Barcode</h1>
     
+    <div class="counter">
+        Elementi scansionati: <span id="items-counter">0</span>
+    </div>
+
     <div class="controls">
         <button id="start-button">Avvia Scanner</button>
         <button id="stop-button" disabled>Ferma Scanner</button>
@@ -56,13 +104,30 @@
     <div id="interactive" class="viewport"></div>
     
     <div class="scanned-items">
-        <h3>Codici scansionati:</h3>
+        <h3>Prodotti scansionati:</h3>
         <ul id="scanned-list"></ul>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    <div id="confirmation-dialog">
+        <h3>Conferma Prodotto</h3>
+        <p>Codice a barre: <strong id="scanned-code"></strong></p>
+        <div>
+            <label for="product-name">Nome Prodotto:</label>
+            <input type="text" id="product-name" placeholder="Inserisci nome prodotto">
+            <label for="product-quantity">Quantità:</label>
+            <input type="number" id="product-quantity" value="1" min="1">
+        </div>
+        <div class="dialog-buttons">
+            <button onclick="cancelScanning()">Annulla</button>
+            <button onclick="confirmProduct()" style="background-color: #28a745">Conferma</button>
+        </div>
     </div>
 
     <script>
         let scannedCodes = [];
         let isScanning = false;
+        let tempScannedCode = null;
 
         // Inizializzazione di QuaggaJS
         function initQuagga() {
@@ -100,43 +165,86 @@
         // Gestione degli eventi di scansione
         Quagga.onDetected(function(result) {
             let code = result.codeResult.code;
-            if (!scannedCodes.includes(code)) {
-                scannedCodes.push({
-                    code: code,
-                    timestamp: new Date().toISOString()
-                });
-                updateScannedList();
-                // Feedback sonoro
-                new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH+Di3hyfXdteIeKi4ServiceWorker...').play();
+            if (!scannedCodes.some(item => item.code === code)) {
+                tempScannedCode = code;
+                showConfirmationDialog(code);
+                Quagga.stop();
+                isScanning = false;
+                document.getElementById('start-button').disabled = false;
+                document.getElementById('stop-button').disabled = true;
             }
         });
+
+        function showConfirmationDialog(code) {
+            document.getElementById('scanned-code').textContent = code;
+            document.getElementById('confirmation-dialog').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('product-name').focus();
+        }
+
+        function confirmProduct() {
+            const productName = document.getElementById('product-name').value.trim();
+            const quantity = document.getElementById('product-quantity').value;
+            
+            if (!productName) {
+                alert('Inserisci il nome del prodotto');
+                return;
+            }
+
+            scannedCodes.push({
+                code: tempScannedCode,
+                name: productName,
+                quantity: quantity,
+                timestamp: new Date().toISOString()
+            });
+
+            updateScannedList();
+            closeConfirmationDialog();
+            new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH+Di3hyfXdteIeKi4ServiceWorker...').play();
+        }
+
+        function cancelScanning() {
+            closeConfirmationDialog();
+        }
+
+        function closeConfirmationDialog() {
+            document.getElementById('confirmation-dialog').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('product-name').value = '';
+            document.getElementById('product-quantity').value = '1';
+            tempScannedCode = null;
+        }
 
         // Aggiorna la lista dei codici scansionati
         function updateScannedList() {
             const list = document.getElementById('scanned-list');
+            const counter = document.getElementById('items-counter');
             list.innerHTML = '';
             scannedCodes.forEach(item => {
                 const li = document.createElement('li');
-                li.textContent = `${item.code} - ${new Date(item.timestamp).toLocaleString()}`;
+                li.textContent = `${item.name} (${item.code}) - Quantità: ${item.quantity} - ${new Date(item.timestamp).toLocaleString()}`;
                 list.appendChild(li);
             });
+            counter.textContent = scannedCodes.length;
         }
 
         // Esporta in CSV
         function exportToCSV() {
             if (scannedCodes.length === 0) {
-                alert('Nessun codice da esportare');
+                alert('Nessun prodotto da esportare');
                 return;
             }
 
             const csvContent = "data:text/csv;charset=utf-8," 
-                + "Codice,Data\n"
-                + scannedCodes.map(item => `${item.code},${item.timestamp}`).join("\n");
+                + "Nome,Codice,Quantità,Data\n"
+                + scannedCodes.map(item => 
+                    `${item.name},${item.code},${item.quantity},${item.timestamp}`
+                ).join("\n");
 
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "codici_scansionati.csv");
+            link.setAttribute("download", "prodotti_scansionati.csv");
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
