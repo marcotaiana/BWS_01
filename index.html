@@ -3,87 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Barcode Scanner</title>
-    <script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
-    <script>
-        let scannedBarcodes = new Set();
-
-        function startScanner() {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert("Accesso alla fotocamera non supportato dal browser.");
-                return;
-            }
-
-            navigator.mediaDevices.getUserMedia({ video: true })
-                .then(function (stream) {
-                    Quagga.init({
-                        inputStream: {
-                            name: "Live",
-                            type: "LiveStream",
-                            target: document.querySelector("#scanner"),
-                            constraints: {
-                                facingMode: "environment"
-                            }
-                        },
-                        decoder: {
-                            readers: ["code_128_reader", "ean_reader", "ean_8_reader", "upc_reader"]
-                        },
-                        locate: true
-                    }, function (err) {
-                        if (err) {
-                            console.error("Errore inizializzazione Quagga:", err);
-                            return;
-                        }
-                        Quagga.start();
-                    });
-
-                    Quagga.onDetected(function (data) {
-                        let barcode = data.codeResult.code;
-                        if (barcode.length >= 8 && !scannedBarcodes.has(barcode)) {
-                            scannedBarcodes.add(barcode);
-                            updateCounter();
-                            updateScannedList(barcode);
-                        }
-                    });
-                })
-                .catch(function (error) {
-                    alert("Impossibile accedere alla fotocamera: " + error.message);
-                });
-        }
-
-        function updateCounter() {
-            document.getElementById("barcodeCounter").innerText = scannedBarcodes.size;
-        }
-
-        function updateScannedList(barcode) {
-            let list = document.getElementById("scannedList");
-            let listItem = document.createElement("li");
-            listItem.innerText = barcode;
-            list.appendChild(listItem);
-        }
-
-        function exportCSV() {
-            if (scannedBarcodes.size === 0) {
-                alert("Nessun barcode scansionato da esportare.");
-                return;
-            }
-            let csvContent = "data:text/csv;charset=utf-8,Barcode,Data/Ora\n" +
-                Array.from(scannedBarcodes).map(code => `${code},${new Date().toLocaleString()}`).join("\n");
-            let encodedUri = encodeURI(csvContent);
-            let link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "barcodes.csv");
-            document.body.appendChild(link);
-            link.click();
-        }
-    </script>
+    <title>Scansione Codici a Barre</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Aggiungi il link alla libreria qr.js -->
+    <script src="https://cdn.jsdelivr.net/npm/qr.js@1.4.4/dist/qr.min.js"></script>
 </head>
 <body>
-    <h1>Barcode Scanner</h1>
-    <div id="scanner" style="width: 100%; height: 300px; border: 1px solid black;"></div>
-    <p>Barcode univoci scansionati: <span id="barcodeCounter">0</span></p>
-    <button onclick="startScanner()">Avvia Scanner</button>
-    <button onclick="exportCSV()">Esporta CSV</button>
-    <ul id="scannedList"></ul>
+    <div class="container">
+        <h1>Scansiona il Codice a Barre</h1>
+
+        <!-- Form per inserire codice venditore e cliente -->
+        <form id="setupForm">
+            <label for="vendorCode">Codice Venditore (3 caratteri):</label>
+            <input type="text" id="vendorCode" name="vendorCode" required>
+
+            <label for="customer">Cliente (fino a 30 caratteri):</label>
+            <input type="text" id="customer" name="customer" required>
+
+            <button type="submit">Imposta Dati</button>
+        </form>
+
+        <!-- Pulsanti per avviare/fermare la scansione -->
+        <button id="startScanButton">Avvia Scansione</button>
+        <button id="stopScanning" style="display: none;">Ferma Scansione</button>
+
+        <div id="scannedItemsContainer"></div>
+    </div>
+
+    <!-- Container per il lettore QRCode -->
+    <div id="scannerElement" style="display:none;"></div>
 </body>
-</html>
